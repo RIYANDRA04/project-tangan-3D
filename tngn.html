@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Hand Gesture Particle Control HD</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      body {
+        overflow: hidden;
+        background-color: #04060d;
+        font-family: Arial, sans-serif;
+        color: #fff;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #canvas-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      /* Clean Camera PiP Box */
+      .camera-container {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        width: 220px;
+        height: 150px;
+        background: #000;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 2px solid #00f2fe;
+        box-shadow: 0 8px 25px rgba(0, 242, 254, 0.35);
+        z-index: 25;
+      }
+
+      #camera-canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        display: block;
+      }
+
+      #webcam {
+        position: fixed;
+        top: -9999px;
+        left: -9999px;
+        width: 640px;
+        height: 480px;
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+
+    <!-- ThreeJS & MediaPipe Hands -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <!-- Hidden Video Source -->
+    <video id="webcam" autoplay playsinline muted></video>
+
+    <!-- 3D WebGL Canvas Layer -->
+    <div id="canvas-container"></div>
+
+    <!-- Live Webcam PiP Canvas -->
+    <div class="camera-container">
+      <canvas id="camera-canvas"></canvas>
+    </div>
+
+    <script>
+      /* ============================================================
+           1. THREE.JS 3D PARTICLE ENGINE (8 EXQUISITE SHAPES)
+           ============================================================ */
+      const PARTICLE_COUNT = 9000;
+      let scene, camera3D, renderer, particleMesh, particleGeo;
+      let currentPos = new Float32Array(PARTICLE_COUNT * 3);
+      let targetPos = new Float32Array(PARTICLE_COUNT * 3);
+      let currentCols = new Float32Array(PARTICLE_COUNT * 3);
+      let targetCols = new Float32Array(PARTICLE_COUNT * 3);
+
+      let activeShapeIndex = 0;
+      let handCenterX = 0.5,
+        handCenterY = 0.5;
+      let isHandDetected = false;
+
+      // 0: Cosmic Spiral Galaxy (🖐️ Open Hand)
+      function genGalaxy() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.pow(Math.random(), 0.5) * 8.5;
+          const spiralAngle = angle + distance * 0.85;
+          pos[i * 3] =
+            Math.cos(spiralAngle) * distance + (Math.random() - 0.5) * 1.5;
+          pos[i * 3 + 1] = (Math.random() - 0.5) * 3.0;
+          pos[i * 3 + 2] =
+            Math.sin(spiralAngle) * distance + (Math.random() - 0.5) * 1.5;
+        }
+        return pos;
+      }
+
+      // 1: 3D Beating Heart (✊ Fist)
+      function genHeart() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const t = Math.random() * Math.PI * 2;
+          const u = Math.random() * Math.PI - Math.PI / 2;
+          const x = 16 * Math.pow(Math.sin(t), 3);
+          const y =
+            13 * Math.cos(t) -
+            5 * Math.cos(2 * t) -
+            2 * Math.cos(3 * t) -
+            Math.cos(4 * t);
+          const z = u * 2.8;
+          const scale = 0.28 + (Math.random() - 0.5) * 0.04;
+          pos[i * 3] = x * scale;
+          pos[i * 3 + 1] = y * scale + 0.5;
+          pos[i * 3 + 2] = z * scale * 3.5;
+        }
+        return pos;
+      }
+
+      // 2: Saturn with Cosmic Rings (☝️ 1 Finger)
+      function genSaturn() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          if (i < PARTICLE_COUNT * 0.42) {
+            const u = Math.random() * Math.PI * 2;
+            const v = Math.acos(2 * Math.random() - 1);
+            const r = 2.4 + (Math.random() - 0.5) * 0.1;
+            pos[i * 3] = r * Math.sin(v) * Math.cos(u);
+            pos[i * 3 + 1] = r * Math.sin(v) * Math.sin(u);
+            pos[i * 3 + 2] = r * Math.cos(v);
+          } else {
+            const theta = Math.random() * Math.PI * 2;
+            const r = 3.6 + Math.random() * 3.4;
+            pos[i * 3] = r * Math.cos(theta);
+            pos[i * 3 + 1] = (Math.random() - 0.5) * 0.18;
+            pos[i * 3 + 2] = r * Math.sin(theta);
+          }
+        }
+        return pos;
+      }
+
+      // 3: 3D Holographic "I LOVE YOU" (✌️ 2 Fingers Peace)
+      function genTextHologram() {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 720;
+        canvas.height = 160;
+
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "900 62px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("I  LOVE  YOU", canvas.width / 2, canvas.height / 2);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const validPixels = [];
+
+        for (let y = 0; y < canvas.height; y += 2) {
+          for (let x = 0; x < canvas.width; x += 2) {
+            const idx = (y * canvas.width + x) * 4;
+            if (imgData.data[idx] > 120) {
+              validPixels.push({
+                x: (x - canvas.width / 2) * 0.026,
+                y: -(y - canvas.height / 2) * 0.026,
+              });
+            }
+          }
+        }
+
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const pt = validPixels[i % validPixels.length];
+          pos[i * 3] = pt.x + (Math.random() - 0.5) * 0.05;
+          pos[i * 3 + 1] = pt.y + (Math.random() - 0.5) * 0.05;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 0.35;
+        }
+        return pos;
+      }
+
+      // 4: 3D Blooming Lotus Flower (🤟 3 Fingers)
+      function genLotus() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const petalIndex = i % 8;
+          const petalAngle = (petalIndex / 8) * Math.PI * 2;
+          const u = Math.random();
+          const v = (Math.random() - 0.5) * 2;
+          const r = u * 4.2;
+          const width = Math.sin(u * Math.PI) * (1.1 - u * 0.35) * v;
+          const height = Math.pow(u, 1.4) * 2.4 - Math.sin(u * Math.PI) * 0.9;
+
+          const xLocal = width;
+          const zLocal = r;
+          const yLocal = height;
+
+          const x =
+            xLocal * Math.cos(petalAngle) - zLocal * Math.sin(petalAngle);
+          const z =
+            xLocal * Math.sin(petalAngle) + zLocal * Math.cos(petalAngle);
+          const y = yLocal - 1.0;
+
+          pos[i * 3] = x + (Math.random() - 0.5) * 0.08;
+          pos[i * 3 + 1] = y + (Math.random() - 0.5) * 0.08;
+          pos[i * 3 + 2] = z + (Math.random() - 0.5) * 0.08;
+        }
+        return pos;
+      }
+
+      // 5: 3D Cyber Butterfly (🤘 Horns / Rock Sign)
+      function genButterfly() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const side = i % 2 === 0 ? 1 : -1;
+          const t = Math.random() * Math.PI * 2;
+          const r =
+            (Math.exp(Math.cos(t)) -
+              2 * Math.cos(4 * t) -
+              Math.pow(Math.sin(t / 12), 5)) *
+            1.5;
+          const x = side * (r * Math.sin(t));
+          const y = r * Math.cos(t) * 0.9;
+          const z = Math.abs(x) * 0.35 + (Math.random() - 0.5) * 0.2;
+          pos[i * 3] = x * 0.9;
+          pos[i * 3 + 1] = y * 0.9;
+          pos[i * 3 + 2] = z * 0.9;
+        }
+        return pos;
+      }
+
+      // 6: Expanding Supernova Starburst (🤏 Pinch / OK Sign)
+      function genSupernova() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          if (i < PARTICLE_COUNT * 0.35) {
+            const u = Math.random() * Math.PI * 2;
+            const v = Math.acos(2 * Math.random() - 1);
+            const r = Math.pow(Math.random(), 2.5) * 1.6;
+            pos[i * 3] = r * Math.sin(v) * Math.cos(u);
+            pos[i * 3 + 1] = r * Math.sin(v) * Math.sin(u);
+            pos[i * 3 + 2] = r * Math.cos(v);
+          } else {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const isRay = i % 6 === 0;
+            const r = isRay
+              ? 2.8 + Math.random() * 4.5
+              : 3.6 + (Math.random() - 0.5) * 0.9;
+            pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+            pos[i * 3 + 2] = r * Math.cos(phi);
+          }
+        }
+        return pos;
+      }
+
+      // 7: Hyperspace Vortex Torus (👍 Thumbs Up)
+      function genTorus() {
+        const pos = new Float32Array(PARTICLE_COUNT * 3);
+        const R = 3.6;
+        const r = 1.3;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const u = Math.random() * Math.PI * 2;
+          const v = Math.random() * Math.PI * 2;
+          pos[i * 3] = (R + r * Math.cos(v)) * Math.cos(u);
+          pos[i * 3 + 1] = r * Math.sin(v);
+          pos[i * 3 + 2] = (R + r * Math.cos(v)) * Math.sin(u);
+        }
+        return pos;
+      }
+
+      // Color Palettes
+      function genGalaxyCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 0.0 + Math.random() * 0.2;
+          col[i * 3 + 1] = 0.75 + Math.random() * 0.25;
+          col[i * 3 + 2] = 0.95 + Math.random() * 0.05;
+        }
+        return col;
+      }
+
+      function genHeartCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 1.0;
+          col[i * 3 + 1] = 0.08 + Math.random() * 0.2;
+          col[i * 3 + 2] = 0.35 + Math.random() * 0.3;
+        }
+        return col;
+      }
+
+      function genSaturnCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          if (i < PARTICLE_COUNT * 0.42) {
+            col[i * 3] = 0.95 + Math.random() * 0.05;
+            col[i * 3 + 1] = 0.65 + Math.random() * 0.2;
+            col[i * 3 + 2] = 0.25 + Math.random() * 0.2;
+          } else {
+            col[i * 3] = 0.4 + Math.random() * 0.5;
+            col[i * 3 + 1] = 0.8 + Math.random() * 0.2;
+            col[i * 3 + 2] = 1.0;
+          }
+        }
+        return col;
+      }
+
+      function genTextCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 0.0;
+          col[i * 3 + 1] = 0.95;
+          col[i * 3 + 2] = 0.98;
+        }
+        return col;
+      }
+
+      function genLotusCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 0.9 + Math.random() * 0.1; // Magenta / Purple
+          col[i * 3 + 1] = 0.2 + Math.random() * 0.4;
+          col[i * 3 + 2] = 0.8 + Math.random() * 0.2;
+        }
+        return col;
+      }
+
+      function genButterflyCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 0.1 + Math.random() * 0.3;
+          col[i * 3 + 1] = 0.9 + Math.random() * 0.1; // Morpho Blue & Emerald
+          col[i * 3 + 2] = 0.9 + Math.random() * 0.1;
+        }
+        return col;
+      }
+
+      function genSupernovaCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 1.0; // Bright Solar Gold & Orange
+          col[i * 3 + 1] = 0.55 + Math.random() * 0.45;
+          col[i * 3 + 2] = 0.1 + Math.random() * 0.3;
+        }
+        return col;
+      }
+
+      function genTorusCols() {
+        const col = new Float32Array(PARTICLE_COUNT * 3);
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          col[i * 3] = 0.6 + Math.random() * 0.4; // Hyperspace Violet-Gold
+          col[i * 3 + 1] = 0.1 + Math.random() * 0.3;
+          col[i * 3 + 2] = 0.95 + Math.random() * 0.05;
+        }
+        return col;
+      }
+
+      const shapes = [
+        genGalaxy(),
+        genHeart(),
+        genSaturn(),
+        genTextHologram(),
+        genLotus(),
+        genButterfly(),
+        genSupernova(),
+        genTorus(),
+      ];
+
+      const shapeColors = [
+        genGalaxyCols(),
+        genHeartCols(),
+        genSaturnCols(),
+        genTextCols(),
+        genLotusCols(),
+        genButterflyCols(),
+        genSupernovaCols(),
+        genTorusCols(),
+      ];
+
+      function initThreeJS() {
+        const container = document.getElementById("canvas-container");
+        scene = new THREE.Scene();
+        camera3D = new THREE.PerspectiveCamera(
+          55,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000,
+        );
+        camera3D.position.z = 11;
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          powerPreference: "high-performance",
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        particleGeo = new THREE.BufferGeometry();
+        const initialPos = shapes[0];
+        const initialCol = shapeColors[0];
+
+        for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+          currentPos[i] = initialPos[i];
+          targetPos[i] = initialPos[i];
+          currentCols[i] = initialCol[i];
+          targetCols[i] = initialCol[i];
+        }
+
+        particleGeo.setAttribute(
+          "position",
+          new THREE.BufferAttribute(currentPos, 3),
+        );
+        particleGeo.setAttribute(
+          "color",
+          new THREE.BufferAttribute(currentCols, 3),
+        );
+
+        const cv = document.createElement("canvas");
+        cv.width = 64;
+        cv.height = 64;
+        const ctx = cv.getContext("2d");
+        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        grad.addColorStop(0, "rgba(255,255,255,1)");
+        grad.addColorStop(0.3, "rgba(255,255,255,0.7)");
+        grad.addColorStop(0.8, "rgba(255,255,255,0.15)");
+        grad.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 64, 64);
+        const particleTex = new THREE.Texture(cv);
+        particleTex.needsUpdate = true;
+
+        const particleMat = new THREE.PointsMaterial({
+          size: 0.08,
+          map: particleTex,
+          vertexColors: true,
+          blending: THREE.AdditiveBlending,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+        });
+
+        particleMesh = new THREE.Points(particleGeo, particleMat);
+        scene.add(particleMesh);
+
+        window.addEventListener("resize", onWindowResize);
+        animate();
+      }
+
+      function setShape(index) {
+        if (index === activeShapeIndex || index < 0 || index >= shapes.length)
+          return;
+        activeShapeIndex = index;
+
+        const tPos = shapes[index];
+        const tCol = shapeColors[index];
+
+        for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+          targetPos[i] = tPos[i];
+          targetCols[i] = tCol[i];
+        }
+      }
+
+      let animTime = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const posArr = particleGeo.attributes.position.array;
+        const colArr = particleGeo.attributes.color.array;
+
+        animTime += 0.05;
+
+        // Heart beat effect
+        let scaleMultiplier = 1.0;
+        if (activeShapeIndex === 1) {
+          scaleMultiplier =
+            1.0 + Math.sin(animTime * 4) * 0.06 + Math.sin(animTime * 8) * 0.03;
+        } else if (activeShapeIndex === 6) {
+          // Supernova pulsation
+          scaleMultiplier = 1.0 + Math.sin(animTime * 5) * 0.12;
+        }
+
+        for (let i = 0; i < PARTICLE_COUNT * 3; i += 3) {
+          let tx = targetPos[i] * scaleMultiplier;
+          let ty = targetPos[i + 1] * scaleMultiplier;
+          let tz = targetPos[i + 2] * scaleMultiplier;
+
+          // Butterfly wing flap animation
+          if (activeShapeIndex === 5) {
+            const flap = Math.sin(animTime * 6) * 0.35;
+            tz += Math.abs(tx) * flap;
+          }
+
+          posArr[i] += (tx - posArr[i]) * 0.14;
+          posArr[i + 1] += (ty - posArr[i + 1]) * 0.14;
+          posArr[i + 2] += (tz - posArr[i + 2]) * 0.14;
+
+          colArr[i] += (targetCols[i] - colArr[i]) * 0.12;
+          colArr[i + 1] += (targetCols[i + 1] - colArr[i + 1]) * 0.12;
+          colArr[i + 2] += (targetCols[i + 2] - colArr[i + 2]) * 0.12;
+        }
+
+        particleGeo.attributes.position.needsUpdate = true;
+        particleGeo.attributes.color.needsUpdate = true;
+
+        // Interactive palm movement tilt
+        if (isHandDetected) {
+          const targetRotY = (handCenterX - 0.5) * 1.5;
+          const targetRotX = (handCenterY - 0.5) * 0.9;
+          particleMesh.rotation.y = THREE.MathUtils.lerp(
+            particleMesh.rotation.y,
+            targetRotY,
+            0.08,
+          );
+          particleMesh.rotation.x = THREE.MathUtils.lerp(
+            particleMesh.rotation.x,
+            targetRotX,
+            0.08,
+          );
+        } else {
+          if (activeShapeIndex === 3) {
+            // "I LOVE YOU" text faces front
+            particleMesh.rotation.x = THREE.MathUtils.lerp(
+              particleMesh.rotation.x,
+              0,
+              0.06,
+            );
+            particleMesh.rotation.y = THREE.MathUtils.lerp(
+              particleMesh.rotation.y,
+              0,
+              0.06,
+            );
+            particleMesh.rotation.z = THREE.MathUtils.lerp(
+              particleMesh.rotation.z,
+              0,
+              0.06,
+            );
+          } else if (activeShapeIndex === 2) {
+            // Saturn tilt & spin
+            particleMesh.rotation.x = 0.35;
+            particleMesh.rotation.y += 0.01;
+          } else if (activeShapeIndex === 4) {
+            // Lotus slow majestic spin
+            particleMesh.rotation.x = 0.45;
+            particleMesh.rotation.y += 0.007;
+          } else if (activeShapeIndex === 7) {
+            // Vortex fast spin
+            particleMesh.rotation.x = 0.6;
+            particleMesh.rotation.y += 0.018;
+          } else {
+            particleMesh.rotation.y += 0.006;
+          }
+        }
+
+        renderer.render(scene, camera3D);
+      }
+
+      function onWindowResize() {
+        camera3D.aspect = window.innerWidth / window.innerHeight;
+        camera3D.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      /* ============================================================
+           2. 8-GESTURE HIGH-PRECISION MEDIAPIPE AI TRACKING
+           ============================================================ */
+      const videoElem = document.getElementById("webcam");
+      const camCanvas = document.getElementById("camera-canvas");
+      const camCtx = camCanvas.getContext("2d");
+
+      const HAND_CONNECTIONS = [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 4],
+        [0, 5],
+        [5, 6],
+        [6, 7],
+        [7, 8],
+        [0, 9],
+        [9, 10],
+        [10, 11],
+        [11, 12],
+        [0, 13],
+        [13, 14],
+        [14, 15],
+        [15, 16],
+        [0, 17],
+        [17, 18],
+        [18, 19],
+        [19, 20],
+        [5, 9],
+        [9, 13],
+        [13, 17],
+      ];
+
+      function detectGesture(landmarks) {
+        // Individual finger open states
+        const isIndexOpen = landmarks[8].y < landmarks[6].y;
+        const isMiddleOpen = landmarks[12].y < landmarks[10].y;
+        const isRingOpen = landmarks[16].y < landmarks[14].y;
+        const isPinkyOpen = landmarks[20].y < landmarks[18].y;
+
+        // Pinch / OK sign: distance between thumb tip (4) and index tip (8)
+        const pinchDist = Math.hypot(
+          landmarks[4].x - landmarks[8].x,
+          landmarks[4].y - landmarks[8].y,
+        );
+        const isPinch = pinchDist < 0.065;
+
+        // Thumbs Up: Thumb tip (4) is highest, while other fingers are closed
+        const isThumbUp =
+          landmarks[4].y < landmarks[3].y &&
+          landmarks[4].y < landmarks[2].y &&
+          !isIndexOpen &&
+          !isMiddleOpen &&
+          !isRingOpen &&
+          !isPinkyOpen;
+
+        // 1. 🤏 Pinch / OK Sign -> Shape 6: Supernova Starburst
+        if (isPinch) {
+          return 6;
+        }
+
+        // 2. 👍 Thumbs Up -> Shape 7: Vortex Portal / Torus
+        if (isThumbUp) {
+          return 7;
+        }
+
+        // 3. 🤘 Rock / Horns (Index + Pinky open, Middle + Ring closed) -> Shape 5: Kupu-Kupu 3D
+        if (isIndexOpen && !isMiddleOpen && !isRingOpen && isPinkyOpen) {
+          return 5;
+        }
+
+        // Count open fingers (excluding thumb)
+        const openCount =
+          (isIndexOpen ? 1 : 0) +
+          (isMiddleOpen ? 1 : 0) +
+          (isRingOpen ? 1 : 0) +
+          (isPinkyOpen ? 1 : 0);
+
+        // 4. 🤟 3 Fingers Open -> Shape 4: Bunga Teratai Mekar (Lotus)
+        if (openCount === 3) {
+          return 4;
+        }
+
+        // 5. ✌️ 2 Fingers Peace (Index + Middle open, Ring + Pinky closed) -> Shape 3: "I LOVE YOU"
+        if (isIndexOpen && isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+          return 3;
+        }
+
+        // 6. ☝️ 1 Finger (Index open only) -> Shape 2: Saturnus
+        if (isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+          return 2;
+        }
+
+        // 7. ✊ Fist (All 4 fingers closed) -> Shape 1: Heart 3D
+        if (!isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
+          return 1;
+        }
+
+        // 8. 🖐️ Open Hand (All fingers open) -> Shape 0: Galaksi Spiral Kosmik
+        if (openCount >= 4) {
+          return 0;
+        }
+
+        return activeShapeIndex;
+      }
+
+      function drawHandSkeleton(landmarks) {
+        camCtx.save();
+        const w = camCanvas.width;
+        const h = camCanvas.height;
+
+        camCtx.lineWidth = 3;
+        camCtx.strokeStyle = "rgba(0, 242, 254, 0.9)";
+        camCtx.shadowColor = "#00f2fe";
+        camCtx.shadowBlur = 8;
+
+        for (const [start, end] of HAND_CONNECTIONS) {
+          const p1 = landmarks[start];
+          const p2 = landmarks[end];
+          camCtx.beginPath();
+          camCtx.moveTo(p1.x * w, p1.y * h);
+          camCtx.lineTo(p2.x * w, p2.y * h);
+          camCtx.stroke();
+        }
+
+        for (let i = 0; i < landmarks.length; i++) {
+          const pt = landmarks[i];
+          camCtx.beginPath();
+          camCtx.arc(
+            pt.x * w,
+            pt.y * h,
+            i === 4 || i === 8 || i === 12 || i === 16 || i === 20 ? 5 : 3.5,
+            0,
+            Math.PI * 2,
+          );
+          camCtx.fillStyle = i === 8 || i === 12 ? "#ff007f" : "#ffffff";
+          camCtx.shadowColor = "#ff007f";
+          camCtx.shadowBlur = 8;
+          camCtx.fill();
+        }
+        camCtx.restore();
+      }
+
+      function onResults(results) {
+        if (!results.image) return;
+
+        if (camCanvas.width !== results.image.width) {
+          camCanvas.width = results.image.width;
+          camCanvas.height = results.image.height;
+        }
+
+        camCtx.save();
+        camCtx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+        camCtx.drawImage(
+          results.image,
+          0,
+          0,
+          camCanvas.width,
+          camCanvas.height,
+        );
+
+        if (
+          results.multiHandLandmarks &&
+          results.multiHandLandmarks.length > 0
+        ) {
+          isHandDetected = true;
+          const landmarks = results.multiHandLandmarks[0];
+
+          drawHandSkeleton(landmarks);
+
+          handCenterX = landmarks[9].x;
+          handCenterY = landmarks[9].y;
+
+          const gestureIndex = detectGesture(landmarks);
+          setShape(gestureIndex);
+        } else {
+          isHandDetected = false;
+        }
+        camCtx.restore();
+      }
+
+      // Initialize Everything
+      initThreeJS();
+
+      const hands = new Hands({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      });
+
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.4,
+        minTrackingConfidence: 0.4,
+      });
+
+      hands.onResults(onResults);
+
+      const camera = new Camera(videoElem, {
+        onFrame: async () => {
+          await hands.send({ image: videoElem });
+        },
+        width: 640,
+        height: 480,
+      });
+
+      camera.start().catch((err) => {
+        console.error("Camera start error:", err);
+        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+          videoElem.srcObject = stream;
+          videoElem.play();
+          const loop = async () => {
+            if (videoElem.readyState >= 2) {
+              await hands.send({ image: videoElem });
+            }
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        });
+      });
+    </script>
+  </body>
+</html>

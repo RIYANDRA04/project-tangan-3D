@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kartu Nama - Naufal Azni Abdullah</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #090a0f;
+      overflow: hidden;
+      perspective: 1000px;
+    }
+
+   
+    .bg-glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: linear-gradient(45deg, #00f0ff, #7928ca);
+      border-radius: 50%;
+      filter: blur(130px);
+      opacity: 0.45;
+      z-index: 1;
+    }
+
+    
+    .card {
+      position: relative;
+      width: 420px;
+      height: 240px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 25px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      transform-style: preserve-3d;
+      will-change: transform;
+      z-index: 2;
+      cursor: pointer;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transform: translateZ(30px);
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      background: linear-gradient(45deg, #00f0ff, #fff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* =========================================================
+       CHIP ATM / EMV HYPER-REALISTIC
+    ========================================================= */
+    .emv-chip {
+      position: relative;
+      width: 50px;
+      height: 38px;
+      background: linear-gradient(
+        135deg, 
+        #ffd966 0%, 
+        #c99a2e 20%, 
+        #ffe89c 40%, 
+        #9b7116 60%, 
+        #e5bb48 80%, 
+        #b2841d 100%
+      );
+      border-radius: 7px;
+      border: 1px solid rgba(255, 223, 128, 0.8);
+      box-shadow: 
+        0 3px 8px rgba(0, 0, 0, 0.7),
+        inset 0 1px 2px rgba(255, 255, 255, 0.9),
+        inset 0 -1px 3px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      transform: translateZ(35px);
+    }
+
+    .chip-contacts {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 1.5px;
+      background: #4a3406;
+      padding: 1.5px;
+    }
+
+    .contact-pad {
+      background: linear-gradient(
+        135deg, 
+        #ffe285 0%, 
+        #b88a22 50%, 
+        #ffd255 100%
+      );
+      border-radius: 1px;
+    }
+
+    .chip-center-circuit {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 18px;
+      border: 1.5px solid #4a3406;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #e5b338, #a87919);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .chip-center-circuit::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: -6px;
+      right: -6px;
+      height: 1.5px;
+      background: #4a3406;
+      transform: translateY(-50%);
+    }
+
+    .emv-chip::after {
+      content: '';
+      position: absolute;
+      top: -100%;
+      left: -100%;
+      width: 300%;
+      height: 300%;
+      background: linear-gradient(
+        45deg,
+        transparent 45%,
+        rgba(255, 255, 255, 0.6) 50%,
+        transparent 55%
+      );
+      transition: transform 0.6s ease;
+      pointer-events: none;
+    }
+
+    .card:hover .emv-chip::after {
+      transform: translate(50%, 50%);
+    }
+    /* ========================================================= */
+
+    .card-body {
+      transform: translateZ(40px);
+    }
+
+    .name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      color: #ffffff;
+    }
+
+    .title {
+      font-size: 11px;
+      color: #00f0ff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      opacity: 0.85;
+      transform: translateZ(25px);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-glow"></div>
+
+  <div class="card" id="card">
+    <div class="card-header">
+      <div class="logo">NAUFAL.DEV</div>
+      
+      <div class="emv-chip">
+        <div class="chip-contacts">
+          <div class="contact-pad"></div>
+          <div class="contact-pad"></div>
+          <div class="contact-pad"></div>
+          <div class="contact-pad"></div>
+          <div class="contact-pad"></div>
+          <div class="contact-pad"></div>
+        </div>
+        <div class="chip-center-circuit"></div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div class="name" contenteditable="true">Naufal Azni Abdullah</div>
+      <div class="title" contenteditable="true">Informatics Student & Developer</div>
+    </div>
+
+    <div class="card-footer">
+      <span contenteditable="true">+62857-7756-5804</span>
+      <span contenteditable="true">naufal@dev.id</span>
+    </div>
+  </div>
+
+  <script>
+    const card = document.getElementById('card');
+    let isHovered = false;
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let time = 0;
+
+    
+    window.addEventListener('mousemove', (e) => {
+      isHovered = true;
+      targetX = (window.innerWidth / 2 - e.clientX) / 12;
+      targetY = (window.innerHeight / 2 - e.clientY) / 12;
+    });
+
+    
+    window.addEventListener('mouseleave', () => {
+      isHovered = false;
+    });
+
+    
+    function autoAnimate() {
+      time += 0.025;
+
+      if (!isHovered) {
+        
+        targetX = Math.sin(time) * 12;
+        targetY = Math.cos(time * 0.8) * 8;
+      }
+
+      
+      currentX += (targetX - currentX) * 0.08;
+      currentY += (targetY - currentY) * 0.08;
+
+      const floatOffset = Math.sin(time * 1.5) * 8; 
+
+      card.style.transform = `translateY(${floatOffset}px) rotateY(${currentX}deg) rotateX(${currentY}deg)`;
+
+      requestAnimationFrame(autoAnimate);
+    }
+
+    autoAnimate();
+  </script>
+</body>
+</html>
